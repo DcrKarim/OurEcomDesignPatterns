@@ -1,67 +1,39 @@
-import { computed, inject } from '@angular/core';
-import {
-  patchState,
-  signalStore,
-  withComputed,
-  withMethods,
-  withState,
-} from '@ngrx/signals';
+import { Injectable } from '@angular/core';
+import { BehaviorSubject, Observable } from 'rxjs';
 import { Product } from '@shared/models/product.interface';
-import { ToastrService } from 'ngx-toastr';
 
-export interface CartStore {
-  products: Product[];
-  totalAmount: number;
-  productsCount: number;
-}
+@Injectable({ providedIn: 'root' })
+export class ShoppingCartStore {
+  private cartProductsSubject = new BehaviorSubject<Product[]>([]);
+  cartProducts$: Observable<Product[]> = this.cartProductsSubject.asObservable();
 
-const initialState: CartStore = {
-  products: [],
-  totalAmount: 0,
-  productsCount: 0,
-};
+  private calculateTotalAmount(products: Product[]): number {
+    return products.reduce((acc, product) => acc + product.price * product.qty, 0);
+  }
 
-export const CartStore = signalStore(
-  { providedIn: 'root' },
-  withState(initialState),
-  withComputed(({ products }) => ({
-    productsCount: computed(() => calculateProductCount(products())),
-    totalAmount: computed(() => calculateTotalAmount(products())),
-  })),
-  withMethods(({ products, ...store }, toastSvc = inject(ToastrService)) => ({
-    addToCart(product: Product) {
-      const isProductInCart = products().find(
-        (item: Product) => item.id === product.id
-      );
+  private calculateProductCount(products: Product[]): number {
+    return products.reduce((acc, product) => acc + product.qty, 0);
+  }
 
-      if (isProductInCart) {
-        isProductInCart.qty++;
-        isProductInCart.subTotal = isProductInCart.qty * isProductInCart.price;
-        patchState(store, { products: [...products()] });
-      } else {
-        patchState(store, { products: [...products(), product] });
-      }
-      toastSvc.success('Product added', 'DOMINI STORE');
-    },
-    removeFromCart(id: number) {
-      const updatedProducts = products().filter((product) => product.id !== id);
-      patchState(store, { products: updatedProducts });
-      toastSvc.info('Product removed', 'DOMINI STORE');
-    },
-    clearCart() {
-      patchState(store, initialState);
-      toastSvc.info('Cart cleared', 'DOMINI STORE');
-    },
-  }))
-);
+  addToCart(product: Product): void {
+    const currentProducts = this.cartProductsSubject.getValue();
+    const productIndex = currentProducts.findIndex((p) => p.id === product.id);
+    if (productIndex !== -1) {
+      currentProducts[productIndex].qty++;
+    } else {
+      currentProducts.push({ ...product, qty: 1 });
+    }
+    this.cartProductsSubject.next([...currentProducts]);
+  }
 
-function calculateTotalAmount(products: Product[]): number {
-  return products.reduce(
-    (acc, product) => acc + product.price * product.qty,
-    0
-  );
-}
+  removeFromCart(id: number): void {
+    const updatedProducts = this.cartProductsSubject
+      .getValue()
+      .filter((product) => product.id !== id);
+    this.cartProductsSubject.next(updatedProducts);
+  }
 
-function calculateProductCount(products: Product[]): number {
-  return products.reduce((acc, product) => acc + product.qty, 0);
+  clearCart(): void {
+    this.cartProductsSubject.next([]);
+  }
 }

@@ -1,7 +1,7 @@
 import { CurrencyPipe } from '@angular/common';
 import { Component, inject } from '@angular/core';
 import { CheckoutService } from '@features/checkout/services/checkout.service';
-import { CartStore } from '@shared/store/shopping-cart.store';
+import { ShoppingCartStore } from '@shared/store/shopping-cart.store';
 
 @Component({
   selector: 'app-checkout',
@@ -10,12 +10,15 @@ import { CartStore } from '@shared/store/shopping-cart.store';
   templateUrl: './checkout.component.html',
 })
 export default class CheckoutComponent {
-  cartStore = inject(CartStore);
+  cartProducts$ = this.cartStore.products$;
 
+  private readonly cartStore = inject(ShoppingCartStore);
   private readonly _checkoutSvc = inject(CheckoutService);
 
   onProceedToPay(): void {
-    this._checkoutSvc.onProceedToPay(this.cartStore.products());
+    this.cartProducts$.subscribe((products) => {
+      this._checkoutSvc.onProceedToPay(products);
+    });
   }
 
   removeItem(id: number): void {
